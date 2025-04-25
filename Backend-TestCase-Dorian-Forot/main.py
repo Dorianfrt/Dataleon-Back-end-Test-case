@@ -1,6 +1,9 @@
 import sys
 import os
+import warnings
 from src.table_detector import TableDetector
+
+warnings.filterwarnings("ignore", category=UserWarning, message=".*state_dict.*")
 
 def main():
     if len(sys.argv) < 2:
@@ -23,6 +26,7 @@ def main():
 
     except Exception as e:
         print(f"[ERROR] Prediction failed: {e}")
+
 
 if __name__ == "__main__":
     main()
