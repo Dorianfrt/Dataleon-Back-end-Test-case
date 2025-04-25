@@ -1,9 +1,17 @@
 import os
+import sys
 import pytest
-from src.table_detector import TableDetector
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+from table_detector import TableDetector
 from PIL import Image
 
-detector = TableDetector()
+@pytest.fixture
+def detector_instance():
+    return TableDetector()
+
+@pytest.fixture
+def high_threshold_detector():
+    return TableDetector(threshold=0.9)
 
 def get_files_in_directory(directory, extensions=(".png", ".jpeg", ".pdf")):
     if not os.path.exists(directory):
@@ -15,86 +23,82 @@ def get_files_in_directory(directory, extensions=(".png", ".jpeg", ".pdf")):
                 files.append(os.path.join(root, filename))
     return files
 
-def test_valid_invoice_images():
+def test_valid_invoice_images(detector_instance):
     """Test detection on all valid invoice images in the 'invoices' folder."""
-    directory = "assets/invoices_good"
+    directory = "assets/dataset/invoices_good"
     files = get_files_in_directory(directory)
     if not files:
         pytest.skip(f"Test skipped: No valid files found in '{directory}'.")
     for image_path in files:
-        results = detector.detector(image_path)
+        results = detector_instance.detector(image_path)
         assert isinstance(results, list), f"Results for {image_path} should be a list."
         for item in results:
             assert "score" in item, f"Each result for {image_path} should have a 'score'."
             assert "box" in item, f"Each result for {image_path} should have a 'box'."
             assert 0 <= item["score"] <= 1, f"Score for {image_path} should be between 0 and 1."
 
-def test_valid_bank_document_images():
+def test_valid_bank_document_images(detector_instance):
     """Test detection on all valid bank document images in the 'bank_documents' folder."""
-    directory = "assets/bank_documents_good"
+    directory = "assets/dataset/bank_documents_good"
     files = get_files_in_directory(directory)
     if not files:
         pytest.skip(f"Test skipped: No valid files found in '{directory}'.")
     for image_path in files:
-        results = detector.detector(image_path)
+        results = detector_instance.detector(image_path)
         assert isinstance(results, list), f"Results for {image_path} should be a list."
         for item in results:
             assert "score" in item, f"Each result for {image_path} should have a 'score'."
             assert "box" in item, f"Each result for {image_path} should have a 'box'."
             assert 0 <= item["score"] <= 1, f"Score for {image_path} should be between 0 and 1."
 
-def test_invalid_image_paths():
+def test_invalid_images(detector_instance):
     """Test detection with invalid image paths."""
-    directory = "assets/invalid_files"
-    files = get_files_in_directory(directory, extensions=(".txt", ".docx"))
+    directory = "assets/dataset/invalid_files"
+    files = get_files_in_directory(directory, extensions=(".txt", ".odt", ".docx", ".epub", ".rtf", ".md"))
     if not files:
         pytest.skip(f"Test skipped: No invalid files found in '{directory}'.")
     for invalid_path in files:
         with pytest.raises(ValueError, match="Cannot open image"):
-            detector.detector(invalid_path)
+            detector_instance.detector(invalid_path)
 
-def test_empty_images():
+def test_empty_images(detector_instance):
     """Test detection with empty images."""
-    directory = "assets/empty_images"
+    directory = "assets/dataset/empty_images"
     files = get_files_in_directory(directory)
     if not files:
         pytest.skip(f"Test skipped: No empty images found in '{directory}'.")
-    for empty_image_path in files:
-        results = detector.detector(empty_image_path)
-        assert results == [], f"Results for {empty_image_path} should be an empty list."
+    for image_path in files:
+        results = detector_instance.detector(image_path)
+        assert results == [], f"Results for {image_path} should be an empty list."
 
-def test_threshold_effect_on_images():
+def test_threshold_images(high_threshold_detector):
     """Test detection with a higher threshold on all images in the 'threshold_test' folder."""
-    directory = "assets/threshold_test"
+    directory = "assets/dataset/threshold_test"
     files = get_files_in_directory(directory)
     if not files:
         pytest.skip(f"Test skipped: No files found in '{directory}'.")
-    high_threshold_detector = TableDetector(threshold=0.9)
     for image_path in files:
         results = high_threshold_detector.detector(image_path)
         assert isinstance(results, list), f"Results for {image_path} should be a list."
         for item in results:
             assert item["score"] >= 0.9, f"Scores for {image_path} should respect the higher threshold."
 
-def test_large_images():
+def test_wrong_dimensions_images(detector_instance):
     """Test detection on all large images in the 'large_images' folder."""
-    directory = "assets/large_images"
+    directory = "assets/dataset/wrong_dimensions_images"
     files = get_files_in_directory(directory)
     if not files:
         pytest.skip(f"Test skipped: No large images found in '{directory}'.")
     for large_image_path in files:
-        results = detector.detector(large_image_path)
-        assert isinstance(results, list), f"Results for {large_image_path} should be a list."
-        for item in results:
-            assert "score" in item, f"Each result for {large_image_path} should have a 'score'."
-            assert "box" in item, f"Each result for {large_image_path} should have a 'box'."
+        with pytest.raises(ValueError, match="Image"): 
+            detector_instance.detector(large_image_path)
 
-def test_corrupted_images():
+def test_corrupted_images(detector_instance):
     """Test detection on all corrupted images in the 'corrupted_images' folder."""
-    directory = "assets/corrupted_images"
+    directory = "assets/dataset/corrupted_images"
     files = get_files_in_directory(directory)
     if not files:
         pytest.skip(f"Test skipped: No corrupted images found in '{directory}'.")
     for corrupted_image_path in files:
         with pytest.raises(ValueError, match="Cannot open image"):
-            detector.detector(corrupted_image_path)
+            detector_instance.detector(corrupted_image_path)
